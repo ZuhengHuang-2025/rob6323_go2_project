@@ -43,7 +43,9 @@ class Rob6323Go2Env(DirectRLEnv):
             key: torch.zeros(self.num_envs, dtype=torch.float, device=self.device)
             for key in [
                 "track_lin_vel_xy_exp",
-                "track_ang_vel_z_exp"
+                "track_ang_vel_z_exp",
+                "rew_action_rate",     # <--- Added
+                "raibert_heuristic"    # <--- Added
             ]
         }
         # Get specific body indices
