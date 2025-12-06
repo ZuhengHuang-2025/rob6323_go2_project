@@ -116,7 +116,12 @@ class Rob6323Go2Env(DirectRLEnv):
 
         # Apply torques to the robot
         self.robot.set_joint_effort_target(torques)
-
+    @property
+    def foot_positions_w(self) -> torch.Tensor:
+        """Returns the feet positions in the world frame.
+        Shape: (num_envs, num_feet, 3)
+        """
+        return self.robot.data.body_pos_w[:, self._feet_ids]
     def _get_observations(self) -> dict:
         self._previous_actions = self._actions.clone()
         obs = torch.cat(
