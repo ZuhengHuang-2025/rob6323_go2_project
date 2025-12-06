@@ -48,6 +48,7 @@ class Rob6323Go2Env(DirectRLEnv):
                 "raibert_heuristic"    # <--- Added
             ]
         }
+        self.last_actions = torch.zeros(self.num_envs, gym.spaces.flatdim(self.single_action_space), 3, dtype=torch.float, device=self.device, requires_grad=False)
         # Get specific body indices
         self._base_id, _ = self._contact_sensor.find_bodies("base")
         # self._feet_ids, _ = self._contact_sensor.find_bodies(".*foot")
