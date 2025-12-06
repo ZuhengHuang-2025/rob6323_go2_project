@@ -82,11 +82,29 @@ class Rob6323Go2Env(DirectRLEnv):
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         self._actions = actions.clone()
-        self._processed_actions = self.cfg.action_scale * self._actions + self.robot.data.default_joint_pos
-
+        #self._processed_actions = self.cfg.action_scale * self._actions + self.robot.data.default_joint_pos
+        self.desired_joint_pos = (
+        self.cfg.action_scale * self._actions 
+        + self.robot.data.default_joint_pos
+        )
     def _apply_action(self) -> None:
-        self.robot.set_joint_position_target(self._processed_actions)
+        #self.robot.set_joint_position_target(self._processed_actions)
+        # Compute PD torques
+        torques = torch.clip(
+            (
+                self.Kp * (
+                    self.desired_joint_pos 
+                    - self.robot.data.joint_pos 
+                )
+                - self.Kd * self.robot.data.joint_vel
+            ),
+            -self.torque_limits,
+            self.torque_limits,
+        )
 
+        # Apply torques to the robot
+        self.robot.set_joint_effort_target(torques)
+        
     def _get_observations(self) -> dict:
         self._previous_actions = self._actions.clone()
         obs = torch.cat(
