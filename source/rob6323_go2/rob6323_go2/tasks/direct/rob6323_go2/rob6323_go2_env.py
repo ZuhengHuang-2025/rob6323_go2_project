@@ -111,9 +111,15 @@ class Rob6323Go2Env(DirectRLEnv):
         yaw_rate_error = torch.square(self._commands[:, 2] - self.robot.data.root_ang_vel_b[:, 2])
         yaw_rate_error_mapped = torch.exp(-yaw_rate_error / 0.25)
         
+        # First derivative (Current - Last)
+        rew_action_rate = torch.sum(torch.square(self._actions - self.last_actions[:, :, 0]), dim=1) * (self.cfg.action_scale ** 2)
+        # Second derivative (Current - 2*Last + 2ndLast)
+        rew_action_rate += torch.sum(torch.square(self._actions - 2 * self.last_actions[:, :, 0] + self.last_actions[:, :, 1]), dim=1) * (self.cfg.action_scale ** 2)
+
         rewards = {
-            "track_lin_vel_xy_exp": lin_vel_error_mapped * self.cfg.lin_vel_reward_scale * self.step_dt,
-            "track_ang_vel_z_exp": yaw_rate_error_mapped * self.cfg.yaw_rate_reward_scale * self.step_dt,
+            "track_lin_vel_xy_exp": lin_vel_error_mapped * self.cfg.lin_vel_reward_scale, # Removed step_dt
+            "track_ang_vel_z_exp": yaw_rate_error_mapped * self.cfg.yaw_rate_reward_scale, # Removed step_dt
+            "rew_action_rate": rew_action_rate * self.cfg.action_rate_reward_scale,
         }
         reward = torch.sum(torch.stack(list(rewards.values())), dim=0)
         # Logging
