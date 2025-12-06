@@ -213,6 +213,40 @@ class Rob6323Go2Env(DirectRLEnv):
         extras["Episode_Termination/base_contact"] = torch.count_nonzero(self.reset_terminated[env_ids]).item()
         extras["Episode_Termination/time_out"] = torch.count_nonzero(self.reset_time_outs[env_ids]).item()
         self.extras["log"].update(extras)
+    def _reward_raibert_heuristic(self):
+        cur_footsteps_translated = self.foot_positions_w - self.robot.data.root_pos_w.unsqueeze(1)
+        footsteps_in_body_frame = torch.zeros(self.num_envs, 4, 3, device=self.device)
+        for i in range(4):
+            footsteps_in_body_frame[:, i, :] = math_utils.quat_apply_yaw(math_utils.quat_conjugate(self.robot.data.root_quat_w),
+                                                            cur_footsteps_translated[:, i, :])
+
+        # nominal positions: [FR, FL, RR, RL]
+        desired_stance_width = 0.25
+        desired_ys_nom = torch.tensor([desired_stance_width / 2, -desired_stance_width / 2, desired_stance_width / 2, -desired_stance_width / 2], device=self.device).unsqueeze(0)
+
+        desired_stance_length = 0.45
+        desired_xs_nom = torch.tensor([desired_stance_length / 2,  desired_stance_length / 2, -desired_stance_length / 2, -desired_stance_length / 2], device=self.device).unsqueeze(0)
+
+        # raibert offsets
+        phases = torch.abs(1.0 - (self.foot_indices * 2.0)) * 1.0 - 0.5
+        frequencies = torch.tensor([3.0], device=self.device)
+        x_vel_des = self._commands[:, 0:1]
+        yaw_vel_des = self._commands[:, 2:3]
+        y_vel_des = yaw_vel_des * desired_stance_length / 2
+        desired_ys_offset = phases * y_vel_des * (0.5 / frequencies.unsqueeze(1))
+        desired_ys_offset[:, 2:4] *= -1
+        desired_xs_offset = phases * x_vel_des * (0.5 / frequencies.unsqueeze(1))
+
+        desired_ys_nom = desired_ys_nom + desired_ys_offset
+        desired_xs_nom = desired_xs_nom + desired_xs_offset
+
+        desired_footsteps_body_frame = torch.cat((desired_xs_nom.unsqueeze(2), desired_ys_nom.unsqueeze(2)), dim=2)
+
+        err_raibert_heuristic = torch.abs(desired_footsteps_body_frame - footsteps_in_body_frame[:, :, 0:2])
+
+        reward = torch.sum(torch.square(err_raibert_heuristic), dim=(1, 2))
+
+        return reward
     # Defines contact plan
     def _step_contact_targets(self):
         frequencies = 3.
