@@ -61,6 +61,18 @@ class Rob6323Go2Env(DirectRLEnv):
         self.Kd = torch.tensor([cfg.Kd] * 12, device=self.device).unsqueeze(0).repeat(self.num_envs, 1)
         self.motor_offsets = torch.zeros(self.num_envs, 12, device=self.device)
         self.torque_limits = cfg.torque_limits
+        # Get specific body indices
+        self._feet_ids = []
+        foot_names = ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]
+        for name in foot_names:
+            id_list, _ = self.robot.find_bodies(name)
+            self._feet_ids.append(id_list[0])
+
+        # Variables needed for the raibert heuristic
+        self.gait_indices = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
+        self.clock_inputs = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False)
+        self.desired_contact_states = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False)
+
 
     def _setup_scene(self):
         self.robot = Articulation(self.cfg.robot_cfg)
